@@ -1,0 +1,1412 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<head> 
+
+<style>
+#min700{font-family:"Lucida Sans Unicode", "Lucida Grande", Sans-Serif;font-size:12px;background:#fff;width:500px;border-collapse:collapse;text-align:left;margin:5px;}
+#min700 th{font-size:14px;font-weight:normal;color:#039;border-bottom:2px solid #6678b1;padding:10px 8px;}
+#min700 td{border-bottom:1px solid #ccc;color:#669;padding:4px 6px;}
+#min700 tbody tr:hover td{color:#009;}
+</style>
+
+ <link href="~/Styles/Site.css" rel="stylesheet" type="text/css" />
+    <link href="~/Styles/tabnav.css" rel="Stylesheet" type="text/css" />
+       <script type="text/javascript" src="https://maps.google.com/maps/api/js?libraries=geometry&sensor=false"></script>
+  
+    script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+<script type="text/javascript" language="javascript">
+ if (!google.maps.Polygon.prototype.getBounds) {
+
+        google.maps.Polygon.prototype.getBounds = function(latLng) {
+
+                var bounds = new google.maps.LatLngBounds();
+                var paths = this.getPaths();
+                var path;
+                
+                for (var p = 0; p < paths.getLength(); p++) {
+                        path = paths.getAt(p);
+                        for (var i = 0; i < path.getLength(); i++) {
+                                bounds.extend(path.getAt(i));
+                        }
+                }
+
+                return bounds;
+        }
+
+}
+</script>
+
+<script type="text/javascript" src="dtree.js"></script>
+
+</head>
+
+<body>
+<div id="error"></div>
+<script type="text/javascript" src="header.js"></script>
+<table style="font-family:'Lucida Sans Unicode'"><th style='font-size:25pt'>GEORGIA 5 year ACS DrillDown Map</th></table>
+NOTE:Will not work in IE at lower levels of geography due to poor memory managment.  Use Chrome or Firefox for full capability. 
+<div id="odiv"></div>
+<table><td valign=top>
+                                <div id="map" style="width: 850px; height: 980px">
+                                    Map</div>
+									
+									<div id=fiplabel style="background: #00ff00;position:absolute;top:200px;left:200px;z-index:100"></div>
+									<br>
+										
+		</td>
+	<td valign=top style="font-family:arial ;font-size:8pt;>								
+									
+ <fieldset style="width:700px">
+<a href="javascript:resetmap();">Reset Map</a>
+                    <legend style="color: Blue; font-weight: bold;">Select Up to 50 Data Elements</legend>
+    (Note: if you select the Total at the top of a data set, you can get percentges for the remainder of the set)<br>
+  <input type=Button onClick=doajax(); Value="Process Choices">..<input type=radio name=dchoice id="dchoiced" checked>Data <input type=radio name=dchoice id="dchoicem">Error Margin  <br>
+ 
+ <input type=Button onClick=doTmapBG('fv'); Value="BG Thematic 1st Var"><br>
+  <input type=Button onClick=doTmapBG('pov'); Value="BG Thematic Poverty"><br>
+ <input type=Button onClick=clearx(); Value="Clear Choices">
+  
+  <script type="text/javascript" src="acstreeNsmall.js"></script>
+  
+  
+</fieldset>
+
+
+
+<div id="legend"></div>
+         </td>
+         <td rowspan=2 valign=top>
+		 Choices:
+		 
+  <div id=svars></div>
+  <hr>
+  <div id="Div2"></div>
+  <div id="Divx"></div>
+	</td>
+	<td>
+	 <div id="Div1"></div>
+     <div id="dout" style="visibility:hidden">   
+    </div>
+	
+	</td>
+	
+	</table>
+<script type="text/javascript">
+
+var legend =""; 
+var tAr; 
+var gmarkers = [];
+var labelsf = []; 
+ var image = new google.maps.MarkerImage('',
+     new google.maps.Size(50, 39),
+     new google.maps.Point(0,0),
+     new google.maps.Point(50, 39));
+    /* var shadow = new google.maps.MarkerImage('marker-panel.png',
+          new google.maps.Size(37, 32),
+          new google.maps.Point(0,0),
+          new google.maps.Point(0, 32));*/
+     var shape = {
+          coord: [1, 1, 1, 20, 18, 20, 18 , 1],
+          type: 'poly'
+     };
+	 
+	   var label;
+	     // Define the overlay, derived from google.maps.OverlayView
+function Label(opt_options) {
+     // Initialization
+     this.setValues(opt_options);
+ 
+     // Here go the label styles
+     var span = this.span_ = document.createElement('span');
+     span.style.cssText = 'position: relative; left: -50%; top: -10px; ' +
+                          'white-space: nowrap;color:#000000;' +
+                          'padding: 2px;font-family: Arial; font-weight: bold;' +
+                          'font-size: 9px;';
+ 
+     var div = this.div_ = document.createElement('div');
+     div.appendChild(span);
+     div.style.cssText = 'position: absolute; display: none';
+};
+ 
+Label.prototype = new google.maps.OverlayView;
+ 
+Label.prototype.onAdd = function() {
+     var pane = this.getPanes().overlayImage;
+     pane.appendChild(this.div_);
+ 
+     // Ensures the label is redrawn if the text or position is changed.
+     var me = this;
+     this.listeners_ = [
+	     // google.maps.event.addListener(this, 'visible_changed', function() { me.draw(); }),
+          google.maps.event.addListener(this, 'position_changed',
+               function() { me.draw(); }),
+          google.maps.event.addListener(this, 'text_changed',
+               function() { me.draw(); }),
+          google.maps.event.addListener(this, 'zindex_changed',
+               function() { me.draw(); })
+     ];
+};
+ 
+// Implement onRemove
+Label.prototype.onRemove = function() {
+     this.div_.parentNode.removeChild(this.div_);
+ 
+     // Label is removed from the map, stop updating its position/text.
+     for (var i = 0, I = this.listeners_.length; i < I; ++i) {
+          google.maps.event.removeListener(this.listeners_[i]);
+     }
+};
+ 
+// Implement draw
+Label.prototype.draw = function() {
+     var projection = this.getProjection();
+     var position = projection.fromLatLngToDivPixel(this.get('position'));
+     var div = this.div_;
+     div.style.left = position.x + 'px';
+     div.style.top = position.y + 'px';
+     div.style.display = 'block';
+	//   var visible = this.get('visible');
+    //  div.style.display = visible ? 'block' : 'none';
+	 
+     div.style.zIndex = this.get('zIndex'); //ALLOW LABEL TO OVERLAY MARKER
+     this.span_.innerHTML = this.get('text').toString();
+};
+
+// Sets the map on all markers in the array.
+function setAllMap(map) {
+  for (var i = 0; i < gmarkers.length; i++) {
+    gmarkers[i].setMap(map);
+	labelsf[i].set('text', ''); 
+  }
+}
+// Removes the markers from the map, but keeps them in the array.
+function clearMarkers() {
+  setAllMap(null);
+}
+
+function deleteMarkers() {
+  clearMarkers();
+  gmarkers = [];
+  labelsf = [];
+}
+
+function doTmap(){
+     deleteMarkers();
+
+    var b2 = parseInt(tracts.length/2); 
+    var b1 = parseInt(b2/2); 
+    var b3 = b2 + b1; 
+    var i = 0; 
+ 
+    var usedpolys = [];
+    var legend = "<div style='background-color: lightblue;width:300px;'><h3>Legend</h3><table>";
+ 
+    var b1val;
+     var b2val;
+      var b3val;
+
+if(tlevel == "tract") {
+v1Ar = v1.split(","); 
+tAr =  trlist.split(","); 
+var tobj = []; 
+
+//alert(trlist);
+
+
+ for(i=0;i< v1Ar.length; i++){
+//tobj[i]  = eval("{ val:" +  v1Ar[i+1]+  ", id:" + tAr[i] + ", order:" + i + "}");   ; 
+tobj[i]  = { val: v1Ar[i], id: tAr[i] , order: i };   ; 
+}
+//alert(tobj[1].id);
+
+tobj.sort(function(a,b){return a.val - b.val})
+var ival = 0; 
+  var sv = "<table>"; 
+  for(i=0;i< tobj.length; i++){
+    if (tobj[i].val != ""){
+	try {
+  
+sv  +=  "<tr><td>" +  tobj[i].val   +  "</td><td>   "  +  tobj[i].id  +  "</td><td>    " + tobj[i].order + "</td></tr>"
+
+   // var m = 0; 
+  //   if (tobj[i].val != ""){m  = parseInt(tobj[i].order)}else{m = parseInt(tobj[i+1].order)  };
+tfipsAr = tfipsst.split(","); 
+  
+	var m = tfipsAr.indexOf(countyfips[currentCounty] +  tobj[i].id);
+     if( tracts[m] != undefined){
+	 
+	 try {
+	          var newPt = tracts[m].getBounds().getCenter();	    
+			  var marker =  new google.maps.Marker({ position:newPt, map: map, visible:true,   title:'',  icon: image,   shape: shape });
+              var label = new Label({map: map });label.set('zIndex', 1234); label.bindTo('position', marker, 'position');  label.set('text', tobj[i].id); 	
+              gmarkers.push(marker);	labelsf.push(label); 		  
+	}catch(err){
+   }	
+	 
+           if(i <= b1){ 
+              if(i == b1){
+			  
+			  
+			
+			 //
+			  legend = legend + "<tr><td bgcolor='#FFFDD5'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 1  < " + tobj[i].val + "  </td></tr>";  b1val = tobj[i].val; }
+                 tracts[m].setOptions( { fillColor: '#FFFDD5' });
+           }
+            if(i > b1 &&  i <= b2){
+             if(i == b2){legend = legend + "<tr><td bgcolor='#B5E61D'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 2: > " + b1val + " & < " + tobj[i].val + "</td></tr>"; b2val = tobj[i].val;  }
+             tracts[m].setOptions( { fillColor: '#B5E61D' });
+           }
+            if(i > b2 && i <= b3){
+             if(i == b3){legend = legend + " <tr><td bgcolor='#FFD235'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 3: > " + b2val + " & < " + tobj[i].val + "</td></tr><tr><td bgcolor=#A35FA4>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 4: > " + tobj[i].val + "</td></tr>";  }
+
+                tracts[m].setOptions( { fillColor: '#FFD235' });
+           }
+             if(i > b3){
+              
+                  tracts[m].setOptions( { fillColor: '#A35FA4' });
+           }
+		}
+	} 
+	catch(err){
+	document.getElementById("error").innerHTML = err.message;
+	}
+
+}
+
+}
+ sv  +=  "<table>"
+  Divx.innerHTML =  legend  +  sv; 
+ 
+ 
+ //  tracts[0].setOptions( { fillColor: '#FFFDD5' });
+
+
+                      
+}
+
+}
+
+// array of results of BG ajax calls
+var bgar = [];
+var acounter = 0; 
+var varlev = "";
+function doTmapBG(vart){
+varlev = vart; 
+
+		if(trlist == ""){alert("You have not yet created a tract level set of data.  First choose a county link to do so."); return }
+			
+		if(tlevel == "tract") {
+		v1Ar = v1.split(","); 
+		tAr =  trlist.split(","); 
+
+		// ===build the Blockgroup data set==========
+		 bgar = [];
+		 acounter = 0; 
+		for(i=0;i< tAr.length; i++){
+		  if(tAr[i] != 0){
+		 
+		   doajaxAgg(countyfips[currentCounty], tAr[i])
+		  
+		  }
+		}
+
+}
+
+
+
+
+
+function doajaxAgg(countyval, tractval) {
+	
+       	var dvar = document.getElementById("svars").innerHTML;
+        var nam = dvar;
+		var ffvar = dvar;
+		var ffnam = "";
+		
+		var i;
+  var count = 0;
+  
+  ffvar = ffvar.substr(0, ffvar.length -1); 
+   ffnam = ffnam.substr(0, ffnam.length -1); 
+	fnamAr = ffnam.split(",");	
+     
+        //  alert("" +dvar + "");
+       // dvar = "P0030001";
+      
+		 var fval = "block+group:*"
+         var inval = "state:13+county:" + countyval + "+tract:" + tractval;
+		
+
+
+        //  alert("http://api.census.gov/data/2010/sf1?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + dvar +"&for=" + fval + " &in=" + inval + "");
+        //var  id = document.getElementById("geoid").value;
+
+        if (id == "") alert("You failed to select a tract");
+        var id = "";
+        var xmlhttp;
+         if (window.XMLHttpRequest) {
+            if (!($.browser.msie)) //good browsers
+                xmlhttp = new XMLHttpRequest();
+            else {               //IE
+                xmlhttp = new XDomainRequest();
+                xmlhttp.onload = function () {
+				 var responsex = xmlhttp.responseText;
+                var obj = eval("(" + responsex + ")");
+                var output = ""
+                var vs = obj[0].toString();
+                vAr = vs.split(",");
+                for (i = 0; i < obj.length; i++) {
+                    if (i > 0) {
+                        var valAr = obj[i].toString().split(",");    
+                     for(k=0;k < valAr.length -2; k++){		
+                          if(fnamAr[k] != undefined){					 
+                           output += "<li>" + fnamAr[k] + ": "  + valAr[k] + "</li>";  
+						   }
+                       }
+                    }
+
+                }
+			  	bgar.push(responsex);	 acounter += 1;		
+				   
+                }
+            }
+        }
+        xmlhttp.onreadystatechange = function () {
+            if (xmlhttp.readyState == 4) {
+
+                var responsex = xmlhttp.responseText;
+                var obj = eval("(" + responsex + ")");
+                var output = ""
+                var vs = obj[0].toString();
+                vAr = vs.split(",");
+                for (i = 0; i < obj.length; i++) {
+                    if (i > 0) {
+                        var valAr = obj[i].toString().split(",");    
+                     for(k=0;k < valAr.length -2; k++){		
+                          if(fnamAr[k] != undefined){					 
+                           output += "<li>" + fnamAr[k] + ": "  + valAr[k] + "</li>";  
+						   }
+                       }
+                    }
+
+                }
+			  bgar.push(responsex);  acounter += 1;	
+			  if(acounter == tAr.length -1){finishBG2(); }
+			  
+            }
+        }
+		
+		//document.getElementById("odiv").innerHTML =  "https://api.census.gov/data/2010/sf1?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + ffvar + "&for=" + fval + " &in=" + inval + "" + id + "";
+		document.getElementById("odiv").innerHTML =  "https://api.census.gov/data/2011/acs5?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + ffvar + "&for=" + fval + " &in=" + inval + "" + id + "";
+        xmlhttp.open("GET", "https://api.census.gov/data/2011/acs5?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + ffvar + "&for=" + fval + " &in=" + inval + "" + id + "", true);
+		
+        xmlhttp.send(null);
+    }
+
+
+function finishBG2(){
+ 
+bglist = "";
+	 v1 = "";
+	 v2 = ""; 
+	 v3 = ""; 
+	 
+var output2 = "<table>"; 
+var bgs = ""; 
+ for(i=0;i< bgar.length; i++){
+ //bgs  += bgar[i] + "|"; 
+ readBG(bgar[i]); 
+ }
+ 
+ 
+ 
+//===process the data ;
+ bglist = bglist.substring(0,bglist.length -1);   
+
+  var  tAr = bglist.split(","); 
+var	v1Ar = v1.split(",");
+//==== build the poverty variable
+if(varlev == "pov"){
+
+		var	v2Ar = v2.split(",");
+		var	v3Ar = v3.split(",");
+			var vnew = []; 
+		   for (var k = 0; k < v1Ar.length; k++) {
+			  vnew[k] =    Math.round(  ( (parseInt(v2Ar[k]) + parseInt(v3Ar[k]))/parseInt(v1Ar[k]) ) * 100 ); 
+			  
+		   } 
+
+}else { }
+
+
+
+ //alert(tAr[0] +   "   " + v1Ar[0]);
+        output2 += output; 
+		output2 += "</table>";	
+        Div2.innerHTML = output2;
+//==========clear tracts
+   for (var i=0; i<tracts.length; i++){
+                        tracts[i].setMap(null);}
+
+//===draw the blockgroup polys
+var fstr = "";
+            for (var i = 0; i < allBlockGroups.length; i++) {
+                       
+                            var path = [];
+                            for (var j = 0; j < allBlockGroups[i].length; j++) {
+                                if (typeof allBlockGroups[i][j][0] == 'number')
+                                    path.push(new google.maps.LatLng(allBlockGroups[i][j][0], allBlockGroups[i][j][1]));
+                                else {
+                                    path[j] = [];
+                                    for (var k = 0; k < allBlockGroups[i][j].length; k++)
+                                        path[j].push(new google.maps.LatLng(allBlockGroups[i][j][k][0], allBlockGroups[i][j][k][1]));
+                                }
+                            }
+                            var blockGroup = new google.maps.Polygon({ strokeWeight: 0.7, fillColor: 'red', paths: path, map: map });
+                            blockGroup.fips = BGpolyfip[i];
+							fstr += blockGroup.fips + ",";
+                            blockGroups.push(blockGroup);
+              }
+                    addBlockGroupLabels();
+
+bgfipAr = fstr.split(",");
+
+
+//========do quartiles
+
+var b2 = parseInt(tAr.length/2); 
+			var b1 = parseInt(b2/2); 
+			var b3 = b2 + b1; 
+			var i = 0; 
+		 
+			var usedpolys = [];
+			var legend = "<div style='background-color: lightblue;width:300px;'><h3>Legend</h3><table>";
+		 
+			var b1val;
+			 var b2val;
+			  var b3val;
+
+
+var tobj = []; 
+
+ for(i=0;i< v1Ar.length; i++){
+	
+		if(varlev == "pov"){tobj[i]  = { val: vnew[i], id: tAr[i] , order: i };  }
+		else {tobj[i]  = { val: v1Ar[i], id:  tAr[i] , order: i };   }
+}
+
+//alert(varlev +  "   "  +  tobj[1].val); 
+
+tobj.sort(function(a,b){return a.val - b.val})
+
+
+
+var ival = 0; 
+
+  var sv = "<table><tr><th colspan=3>Rank of Blockgroups</th></tr><tr><th>Color</th><th>Value</th><th>Geoid</th><th>Order</th></tr>"; 
+  for(i=0;i< tobj.length; i++){
+    try {
+	
+	 if(i==0) deleteMarkers();
+	 
+     if (tobj[i].val != ""){
+    var m = 0; 
+	
+	var mn = bgfipAr.indexOf(tobj[i].id);
+	
+
+	
+	 
+	          var newPt = blockGroups[mn].getBounds().getCenter();	    
+			  var marker =  new google.maps.Marker({ position:newPt, map: map, visible:true,   title:'',  icon: image,   shape: shape });
+              var label = new Label({map: map });label.set('zIndex', 1234); label.bindTo('position', marker, 'position');  label.set('text', tobj[i].id); 	
+              gmarkers.push(marker);	labelsf.push(label);	
+	 
+	 
+	 
+	           if(i <= b1){ 
+					if(i == b1){
+						  legend = legend + "<tr><td bgcolor='#FFFDD5'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 1  < " + tobj[i].val + "  </td></tr>";  b1val = tobj[i].val; 
+					}
+                if(blockGroups[mn] != undefined){  blockGroups[mn].setOptions( { fillColor: '#FFFDD5' }); }
+				 sv  +=  "<tr><td bgcolor='#FFFDD5'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>" +  tobj[i].val   +  "</td><td>   "  +  tobj[i].id  +  "</td><td>    " + tobj[i].order + "  </td></tr>"
+				 
+           }
+            if(i > b1 &&  i <= b2){
+             if(i == b2){legend = legend + "<tr><td bgcolor='#B5E61D'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 2: > " + b1val + " & < " + tobj[i].val + "</td></tr>"; b2val = tobj[i].val;  }
+              if(blockGroups[mn] != undefined){  blockGroups[mn].setOptions( { fillColor: '#B5E61D' }); }
+			  sv  +=  "<tr><td bgcolor='#B5E61D'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>" +  tobj[i].val   +  "</td><td>   "  +  tobj[i].id  +  "</td><td>    " + tobj[i].order + "</td></tr>"
+           }
+            if(i > b2 && i <= b3){
+             if(i == b3){legend = legend + " <tr><td bgcolor='#FFD235'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 3: > " + b2val + " & < " + tobj[i].val + "</td></tr><tr><td bgcolor=#A35FA4>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>Quartile 4: > " + tobj[i].val + "</td></tr>";  }
+
+                 if(blockGroups[mn] != undefined){ blockGroups[mn].setOptions( { fillColor: '#FFD235' });}
+				 sv  +=  "<tr><td bgcolor='#FFD235'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>" +  tobj[i].val   +  "</td><td>   "  +  tobj[i].id  +  "</td><td>    " + tobj[i].order + "</td></tr>"
+           }
+             if(i > b3){
+              if(blockGroups[mn] != undefined){ blockGroups[mn].setOptions( { fillColor: '#A35FA4' });
+			   sv  +=  "<tr><td bgcolor='#A35FA4'>&nbsp;&nbsp;&nbsp;&nbsp;</td><td>" +  tobj[i].val   +  "</td><td>   "  +  tobj[i].id  +  "</td><td>    " + tobj[i].order + "</td></tr>"
+			  }		  
+			  
+           }
+		   
+		 }  
+		   
+	 } 
+	catch(err){
+	document.getElementById("error").innerHTML = err.message;
+	}
+		   
+	
+}
+ sv  +=  "<table>"
+  Divx.innerHTML =  legend  +  sv; 
+ }
+  
+  
+   }
+
+ var output = "<table id='min700'><tr>";
+ var bglist = ""; 
+ function readBG(txt) {
+		
+	 trlist = ""; 
+
+	tlevel = ""; 	
+        var dvar = document.getElementById("svars").innerHTML;
+        var nam = dvar.split(","); 
+        //var txt = document.getElementById("dout").innerHTML;
+
+          
+        var obj = eval("(" + txt + ")");
+
+        var vs = obj[0].toString();
+		
+       
+        vAr = vs.split(",");
+
+        var cfip = ""; 
+       
+        var isblock = false;
+		var istract = false;
+		var isBG = false;
+		var donemap = false; 
+		
+		var statespot = 0; 
+        for (i = 0; i < obj.length; i++) {
+
+            if (i == 0) {
+                var valAr = obj[i].toString().split(",");
+				 
+				
+                for (var a = 0; a < valAr.length; a++) {
+                    if (a == 0) { output += "<th>" + valAr[a] + "</th>"; } else {
+                        output += "<th>" + valAr[a] + "</th>";
+                    }
+										
+                    if (valAr[a] == "state") statespot = a;					
+                    if (valAr[a] == "block") isblock = true;
+					 if (valAr[a] == "tract") istract = true;
+					  if (valAr[a] == "block group") isBG = true;
+					 
+                }
+                output += "</tr>";
+            }
+            else {
+                output += "<tr>"
+                var valAr = obj[i].toString().split(",");
+				
+                for (var a = 0; a < valAr.length; a++) {
+                    if (a < statespot) { output += "<td align=right>" + valAr[a] + "</td>";
+                    if(a==0) v1 += valAr[a] + ",";
+					if(a==1) v2 += valAr[a] + ",";
+					if(a==2) v3 += valAr[a] + ",";
+
+					}
+                    else {
+					//alert(istract +  "   " + isBG +   "   " +isblock)
+					//alert(a + "  " + vallength  + "  " +  valAr[a]  ); 
+					
+					
+                        if (a == statespot) {
+                            output += "<td><a href=javascript:doajax()>" + valAr[a] + "</a></td>";
+                        }
+
+                        if (a == statespot + 1 ) {
+						  tlevel = "county"
+                            output += "<td><a href=javascript:drillt('" + valAr[a] + "')>" + valAr[a] + "</a>   " + gname(valAr[a]) + "</td>";
+							  if (istract == true) {
+							  cfip =   valAr[a] ;
+							  }
+                        }
+                        if (a == statespot + 2 ) {
+						   tlevel = "tract"
+						   // set current county
+						//   alert(valAr[a - 1]  + "   " + fipsAr[0] );
+			
+						   
+						   
+						  
+						   
+                            output += "<td>" + valAr[a] + " <a href=javascript:drillBG('" + valAr[a - 1] + "," + valAr[a] + "')>BLKG</a>.. <a href=javascript:drillB('" + valAr[a - 1] + "," + valAr[a] + "')>BLK</a></td>";
+							  if (istract == true) {
+							  trlist +=   valAr[a] + ",";
+							  }
+							
+                        }
+                        if (a == statespot + 3 ) {
+						 tlevel = "BG"
+                            if (isblock != true) {
+                                output += "<td align=center><a href=javascript:drillfB('" + valAr[a - 2] + "," + valAr[a - 1] + "," + valAr[a] + "')>" + valAr[a] + "</a></td>";
+								  bglist +=    valAr[a - 2] + "" + valAr[a - 1] +"" + valAr[a] + ",";
+								
+                            } else {
+                                output += "<td><a href=javascript:dblock('" +  valAr[a - 2].toString() + "," + valAr[a - 1].toString() + "," + valAr[a].toString() +  "')>"  + valAr[a] +  "</a></td>";
+                            }							
+                        }		
+
+                    }
+                }
+                output += "</tr>";
+            }
+        }
+		
+       
+		
+			
+    }			
+		  
+ 
+
+
+
+function resetmap(){
+        var zto = new google.maps.LatLng(32.80, -83.2);
+         map.setCenter(zto); 
+          map.setZoom(8);
+
+}
+
+    var currentCounty;
+    var currentTract;
+    var currentBG;
+    var currentBlock;
+    var counties = [];
+    var tracts = [];
+    var blockGroups = [];
+    var blocks = []
+
+
+                var map = new google.maps.Map(document.getElementById('map'), {
+                    zoom: 8,
+							disableDefaultUI: true,
+					 zoomControl: true,
+					 zoomControlOptions: {
+      style: google.maps.ZoomControlStyle.SMALL
+    },
+                    center: new google.maps.LatLng(32.80, -83.2),
+                    mapTypeId: google.maps.MapTypeId.ROADMAP
+                });
+
+                function drawCounties() {
+                    for (var i = 0; i < allCounties.length; i++) {
+                        var path = [];
+                        for (var j = 0; j < allCounties[i].length; j++) {
+                            if (typeof allCounties[i][j][0] == 'number')
+                                path.push(new google.maps.LatLng(allCounties[i][j][0], allCounties[i][j][1]));
+                            else {
+                                path[j] = [];
+                                for (var k = 0; k < allCounties[i][j].length; k++)
+                                    path[j].push(new google.maps.LatLng(allCounties[i][j][k][0], allCounties[i][j][k][1]));
+                            }
+                        }
+                        var county = new google.maps.Polygon({ strokeWeight: 0.7, fillColor: '#EFEDB0', paths: path, map: map });
+                        counties.push(county);
+                    }
+                    addCountyListeners();
+                }
+                
+var tfipsst;   
+   function drawTracts() {
+   tfipsst = ""; 
+                    for (var i=0; i<tracts.length; i++)
+                        tracts[i].setMap(null);
+                    tracts = [];
+                    for (var i = 0; i < blockGroups.length; i++)
+                        blockGroups[i].setMap(null);
+                    blockGroups = [];
+                    for (var i = 0; i < blocks.length; i++)
+                        blocks[i].setMap(null);
+                    blocks = [];
+					
+					currentBG = undefined;
+					currentTract = undefined; 
+					currentBlock = undefined; 
+					
+                    for (var i = 0; i < allTracts.length; i++) {
+                        if (tractfips[i].substring(0, 3).indexOf(countyfips[currentCounty]) > -1) {
+                            var path = [];
+                            for (var j = 0; j < allTracts[i].length; j++) {
+                                if (typeof allTracts[i][j][0] == 'number')
+                                    path.push(new google.maps.LatLng(allTracts[i][j][0], allTracts[i][j][1]));
+                                else {
+                                    path[j] = [];
+                                    for (var k = 0; k < allTracts[i][j].length; k++)
+                                        path[j].push(new google.maps.LatLng(allTracts[i][j][k][0], allTracts[i][j][k][1]));
+                                }
+                            }
+                            var tract = new google.maps.Polygon({ strokeWeight: 0.7, fillColor: 'blue', paths: path, map: map });
+                            tract.fips = tractfips[i];
+							tfipsst += tract.fips + ","; 
+                            tracts.push(tract);
+                        }
+                    }
+                    addTractListeners();
+					
+                }
+
+                function drawBlockGroups() {
+                    for (var i = 0; i < blockGroups.length; i++)
+                        blockGroups[i].setMap(null);
+                    blockGroups = [];
+                    for (var i = 0; i < blocks.length; i++)
+                        blocks[i].setMap(null);
+                    blocks = [];
+					currentBG = undefined;
+					currentBlock = undefined; 
+					
+                    for (var i = 0; i < allBlockGroups.length; i++) {
+                        if (BGpolyfip[i].indexOf(tracts[currentTract].fips) > -1) {
+                            var path = [];
+                            for (var j = 0; j < allBlockGroups[i].length; j++) {
+                                if (typeof allBlockGroups[i][j][0] == 'number')
+                                    path.push(new google.maps.LatLng(allBlockGroups[i][j][0], allBlockGroups[i][j][1]));
+                                else {
+                                    path[j] = [];
+                                    for (var k = 0; k < allBlockGroups[i][j].length; k++)
+                                        path[j].push(new google.maps.LatLng(allBlockGroups[i][j][k][0], allBlockGroups[i][j][k][1]));
+                                }
+                            }
+                            var blockGroup = new google.maps.Polygon({ strokeWeight: 0.7, fillColor: 'red', paths: path, map: map });
+                            blockGroup.fips = BGpolyfip[i];
+                            blockGroups.push(blockGroup);
+                        }
+                    }
+                    addBlockGroupListeners();
+                }
+
+                function drawBlocksX() {
+                    for (var i = 0; i < blocks.length; i++)
+                        blocks[i].setMap(null);
+                    blocks = [];
+					currentBlock = undefined; 
+                    for (var i = 0; i < allBlocks.length; i++) {
+                        if (blockpolyfip[i].indexOf(blockGroups[currentBG].fips) > -1) {
+                            var path = [];
+                            for (var j = 0; j < allBlocks[i].length; j++) {
+                                if (typeof allBlocks[i][j][0] == 'number')
+                                    path.push(new google.maps.LatLng(allBlocks[i][j][0], allBlocks[i][j][1]));
+                                else {
+                                    path[j] = [];
+                                    for (var k = 0; k < allBlocks[i][j].length; k++)
+                                        path[j].push(new google.maps.LatLng(allBlocks[i][j][k][0], allBlocks[i][j][k][1]));
+                                }
+                            }
+                            var block = new google.maps.Polygon({ strokeWeight: 0.7, fillColor: 'green', paths: path, map: map });
+                            block.fips = blockpolyfip[i];
+                            blocks.push(block);
+                        }
+                    }
+                    addBlockListeners();
+                }
+
+                function drawBlocks() { 
+                    //dummy function
+                }
+                
+                function addCountyListeners() {
+                    for (var i = 0; i < counties.length; i++) {
+                        google.maps.event.addListener(counties[i], 'click', function(params) {
+                            for (var i = 0; i < counties.length; i++) {
+                                if (this == counties[i]) {
+                                   var fval = "county:" + countyfips[i];
+                                    var inval = "state:13";
+                                    countyToTracts(i);
+                                    doajax(fval, inval);									
+									map.fitBounds(counties[i].getBounds()); 
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+
+                function addTractListeners() {
+                    for (var i = 0; i < tracts.length; i++) {
+                        google.maps.event.addListener(tracts[i], 'click', function (params) {
+                            for (var i = 0; i < tracts.length; i++) {
+                                if (this == tracts[i]) {
+								   
+                                    tractToBlockGroups(i);
+									 var fval = "tract:" + tracts[currentTract].fips.substr(3); 
+                                    var inval = "state:13+county:" + countyfips[currentCounty];
+                                    doajax(fval, inval);
+										map.fitBounds(tracts[i].getBounds()); 
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+
+                function addBlockGroupListeners() {
+                    for (var i = 0; i < blockGroups.length; i++) {
+                        google.maps.event.addListener(blockGroups[i], 'click', function (params) {
+                            for (var i = 0; i < blockGroups.length; i++) {
+                                if (this == blockGroups[i]) {
+                                   
+                                    blockGroupToBlocks(i);
+									//alert(blockGroups[currentBG].fips.substr(9));
+                                    var fval = "block+group:" + blockGroups[currentBG].fips.substr(9); 
+                                    var inval = "state:13+county:" + countyfips[currentCounty] + "+tract:" +   tracts[currentTract].fips.substr(3);
+                                    doajax(fval, inval);
+									map.fitBounds(blockGroups[i].getBounds()); 
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+				
+				   function addBlockGroupLabels() {
+                    for (var i = 0; i < blockGroups.length; i++) {
+                        google.maps.event.addListener(blockGroups[i], 'mouseover', function (params) {
+                            for (var i = 0; i < blockGroups.length; i++) {
+                                if (this == blockGroups[i]) {
+                                   fiplabel.innerHTML = "Blockgroup: " +  BGpolyfip[i].substring(3);
+                                   // alert(BGpolyfip[i]);
+									//alert(blockGroups[currentBG].fips.substr(9));
+                                  
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+				
+				
+
+                function addBlockListeners() {
+                    for (var i = 0; i < blocks.length; i++) {
+                        google.maps.event.addListener(blocks[i], 'click', function (params) {
+                            for (var i = 0; i < blocks.length; i++) {
+                                if (this == blocks[i]) {
+                                    colorBlock(i);
+                                    var fval = "block:" + blocks[currentBlock].fips.substr(9); 
+                                    var inval = "state:13+county:" + countyfips[currentCounty] + "+tract:" +   tracts[currentTract].fips.substr(3);
+                                    doajax(fval, inval);
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+
+                function countyToTracts(index) {
+                    if (currentCounty != undefined) counties[currentCounty].setMap(map);
+                    currentCounty = index;
+                    counties[currentCounty].setMap(null);
+                    drawTracts();
+                    loadScript("scripts/bg" + countyfips[currentCounty] + ".js");
+                    loadScript("scripts/blocks" + countyfips[currentCounty] + ".js");
+                }
+
+                function tractToBlockGroups(index) {
+                    if (currentTract != undefined) tracts[currentTract].setMap(map);
+                    currentTract = index;
+                    tracts[currentTract].setMap(null);
+                    drawBlockGroups();
+                }
+                
+                function blockGroupToBlocks(index) {
+				
+                    if (currentBG != undefined) blockGroups[currentBG].setMap(map);
+                    currentBG = index;
+                    blockGroups[currentBG].setMap(null);
+                    drawBlocksX();
+                }
+
+                function colorBlock(index) {
+                    if (currentBlock != undefined) blocks[currentBlock].setOptions({ fillColor: 'green' });
+                    currentBlock = index;
+                    blocks[currentBlock].setOptions({ fillColor: '#66FF33' });
+                }
+                    
+                function loadScript(path) {
+                    for (var i = 0; i < blocks.length; i++)
+                        blocks[i].setMap(null);
+                    blocks = [];
+                    var response = $.ajax({
+                        url: path,
+                        type: 'HEAD',
+                        async: false
+                    }).status;
+                    if (response == '200') {
+                        var head = document.getElementsByTagName('head')[0];
+                        var script = document.createElement('script');
+                        script.type = 'text/javascript';
+                        script.src = path;
+                        head.appendChild(script);
+                    }
+                }
+
+
+	//=========================END OF JAYS CODE========================
+
+	function drawPolysBG(){return}
+	
+var fipsSt = "001,003,005,007,009,011,013,015,017,019,021,023,025,027,029,031,033,035,037,039,043,045,047,049,051,053,055,057,059,061,063,065,067,069,071,073,075,077,079,081,083,085,087,089,091,093,095,097,099,101,103,105,107,109,111,113,115,117,119,121,123,125,127,129,131,133,135,137,139,141,143,145,147,149,151,153,155,157,159,161,163,165,167,169,171,173,175,177,179,181,183,185,187,193,195,197,189,191,199,201,205,207,209,211,213,215,217,219,221,223,225,227,229,231,233,235,237,239,241,243,245,247,249,251,253,255,257,259,261,263,265,267,269,271,273,275,277,279,281,283,285,287,289,291,293,295,297,299,301,303,305,307,309,311,313,315,317,319,321";
+
+var namesSt = "Appling,Atkinson,Bacon,Baker,Baldwin,Banks,Barrow,Bartow,Ben Hill,Berrien,Bibb,Bleckley,Brantley,Brooks,Bryan,Bulloch,Burke,Butts,Calhoun,Camden,Candler,Carroll,Catoosa,Charlton,Chatham,Chattahoochee,Chattooga,Cherokee,Clarke,Clay,Clayton,Clinch,Cobb,Coffee,Colquitt,Columbia,Cook,Coweta,Crawford,Crisp,Dade,Dawson,Decatur,DeKalb,Dodge,Dooly,Dougherty,Douglas,Early,Echols,Effingham,Elbert,Emanuel,Evans,Fannin,Fayette,Floyd,Forsyth,Franklin,Fulton,Gilmer,Glascock,Glynn,Gordon,Grady,Greene,Gwinnett,Habersham,Hall,Hancock,Haralson,Harris,Hart,Heard,Henry,Houston,Irwin,Jackson,Jasper,Jeff Davis,Jefferson,Jenkins,Johnson,Jones,Lamar,Lanier,Laurens,Lee,Liberty,Lincoln,Long,Lowndes,Lumpkin,Macon,Madison,Marion,McDuffie,McIntosh,Meriwether,Miller,Mitchell,Monroe,Montgomery,Morgan,Murray,Muscogee,Newton,Oconee,Oglethorpe,Paulding,Peach,Pickens,Pierce,Pike,Polk,Pulaski,Putnam,Quitman,Rabun,Randolph,Richmond,Rockdale,Schley,Screven,Seminole,Spalding,Stephens,Stewart,Sumter,Talbot,Taliaferro,Tattnall,Taylor,Telfair,Terrell,Thomas,Tift,Toombs,Towns,Treutlen,Troup,Turner,Twiggs,Union,Upson,Walker,Walton,Ware,Warren,Washington,Wayne,Webster,Wheeler,White,Whitfield,Wilcox,Wilkes,Wilkinson,Worth"; 
+
+fipsAr = fipsSt.split(",");
+namesAr = namesSt.split(",");
+ labels = namesSt.split(",");
+
+        function gname(fip){
+		var id = fipsAr.indexOf(fip); 		
+		var name = ""; 		 
+		name = namesAr[id];		  
+		return name
+		}
+
+function clearx(){
+ 
+    document.getElementById("svars").innerHTML = "";
+	
+}	
+
+function doajax(fval, inval) {
+	
+        var fval = fval;
+        var inval = inval;
+		   var dvar = document.getElementById("svars").innerHTML;
+        var nam = dvar;
+		var ffvar = dvar;
+		var ffnam = "";
+		
+		var i;
+  var count = 0;
+ 
+  
+  ffvar = ffvar.substr(0, ffvar.length -1); 
+   ffnam = ffnam.substr(0, ffnam.length -1); 
+	fnamAr = ffnam.split(",");	
+     
+        //  alert("" +dvar + "");
+       // dvar = "P0030001";
+        if (fval == undefined) fval = "county:*";
+        if (inval == undefined) inval = "state:13";
+
+
+        //  alert("https://api.census.gov/data/2010/sf1?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + dvar +"&for=" + fval + " &in=" + inval + "");
+        //var  id = document.getElementById("geoid").value;
+
+        if (id == "") alert("You failed to select a tract");
+        var id = "";
+        var xmlhttp;
+         if (window.XMLHttpRequest) {
+            if (!($.browser.msie)) //good browsers
+                xmlhttp = new XMLHttpRequest();
+            else {               //IE
+                xmlhttp = new XDomainRequest();
+                xmlhttp.onload = function () {
+				 var responsex = xmlhttp.responseText;
+                var obj = eval("(" + responsex + ")");
+                var output = ""
+                var vs = obj[0].toString();
+                vAr = vs.split(",");
+                for (i = 0; i < obj.length; i++) {
+                    if (i > 0) {
+                        var valAr = obj[i].toString().split(",");    
+                     for(k=0;k < valAr.length -2; k++){		
+                          if(fnamAr[k] != undefined){					 
+                           output += "<li>" + fnamAr[k] + ": "  + valAr[k] + "</li>";  
+						   }
+                       }
+                    }
+
+                }
+			   document.getElementById("dout").innerHTML = responsex;
+				  if(fval != "block:*"  && fval != "block+group:*"  && fval != "tract:*"  ){
+				                  //   doit();
+				 }
+				 isdrillBG = false
+				 doitdrill(responsex);   
+				
+				   
+                }
+            }
+        }
+        xmlhttp.onreadystatechange = function () {
+            if (xmlhttp.readyState == 4) {
+
+                var responsex = xmlhttp.responseText;
+                var obj = eval("(" + responsex + ")");
+                var output = ""
+                var vs = obj[0].toString();
+                vAr = vs.split(",");
+                for (i = 0; i < obj.length; i++) {
+                    if (i > 0) {
+                        var valAr = obj[i].toString().split(",");    
+                     for(k=0;k < valAr.length -2; k++){		
+                          if(fnamAr[k] != undefined){					 
+                           output += "<li>" + fnamAr[k] + ": "  + valAr[k] + "</li>";  
+						   }
+                       }
+                    }
+
+                }
+			   document.getElementById("dout").innerHTML = responsex;
+				  if(fval != "block:*"  && fval != "block+group:*"  && fval != "tract:*"  ){
+				                  //   doit();
+				 }
+				 isdrillBG = false
+				 doitdrill(responsex);
+            }
+        }
+		
+		//document.getElementById("odiv").innerHTML =  "https://api.census.gov/data/2010/sf1?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + ffvar + "&for=" + fval + " &in=" + inval + "" + id + "";
+		document.getElementById("odiv").innerHTML =  "https://api.census.gov/data/2011/acs5?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + ffvar + "&for=" + fval + " &in=" + inval + "" + id + "";
+        xmlhttp.open("GET", "https://api.census.gov/data/2011/acs5?key=47dfcecadae72765540927c5585aeff8243b55f2&get=" + ffvar + "&for=" + fval + " &in=" + inval + "" + id + "", true);
+		
+        xmlhttp.send(null);
+    }
+
+				
+	
+
+var itot = [];
+
+  function doit(tval) {
+  
+     if(document.getElementById("dchoiced").checked){
+      document.getElementById("svars").innerHTML  = document.getElementById("svars").innerHTML  +  tval + "E,"; 
+     }else{
+	     document.getElementById("svars").innerHTML  = document.getElementById("svars").innerHTML  +  tval + "M,"; 
+	 }
+  
+  }
+    function doitNext() {
+	
+	 //maptheme();
+        var txt = document.getElementById("dout").innerHTML;
+        var obj = eval("(" + txt + ")");
+        var vs = obj[0].toString();
+        vAr = vs.split(",");
+        var output = "<table id='min700'><tr>";
+        var isblock = false;
+		var tot = -1; 		
+		var aa = -1;
+        for (i = 0; i < obj.length; i++) {
+ 
+            if (i == 0) {
+                var valAr = obj[i].toString().split(",");
+                for (var a = 0; a < valAr.length; a++) {
+				
+				 if(valAr[a].substr(valAr[a].length-1, valAr[a].length) == "1"){tot = a;}
+				    var rname =""; 
+					if( fnamAr[a] != undefined)rname = fnamAr[a];
+                    output += "<th>" + rname + "<br>" + valAr[a] + "</th>";
+					if(tot != -1 & a != 0 && a != valAr.length-1  && a != valAr.length-2){ output += "<th>" + valAr[a] + "%</th>";}
+                    if (valAr[a] == "block") isblock = true;
+                }
+                output += "</tr>";
+            }
+            else {
+                output += "<tr>"
+                var valAr = obj[i].toString().split(",");
+				 
+                for (var a = 0; a < valAr.length; a++) {
+				 
+                    if (a < 1) { output += "<td>" + valAr[a] + "</td>";
+                	 if(a==tot){  aa += 1; itot[aa] =  valAr[a]; 	
+					 }
+					}
+                    else {
+					   
+					   if(a == valAr.length -1){
+					  output += "<td>" + valAr[a] + "  " +  gname(valAr[a]) + "</td>";
+					   }else{
+					    output += "<td>" + valAr[a] + " </td>";
+					   }
+					   
+					  if(a != tot && tot != -1  && a != valAr.length-1  && a != valAr.length-2 ){
+					  
+					      output += "<td>" + Math.round( (valAr[a]/itot[aa])*100) + "</td>";
+					  }
+                    }
+					
+                }
+                output += "</tr>";
+            }
+
+
+        }
+        output += "</table>";
+       // Div1.innerHTML = output;
+    }
+
+
+
+	var trlist = ""; 
+	var v1 = "";
+	var v2 = ""; 
+	var v3 = ""; 
+	var tlevel;
+ function doitdrill(txt) {
+		
+	 trlist = ""; 
+	 v1 = "";
+	 v2 = ""; 
+	 v3 = ""; 
+	tlevel = ""; 	
+        var dvar = document.getElementById("svars").innerHTML;
+        var nam = dvar.split(","); 
+        //var txt = document.getElementById("dout").innerHTML;
+
+          
+        var obj = eval("(" + txt + ")");
+
+        var vs = obj[0].toString();
+		
+       
+        vAr = vs.split(",");
+
+        var cfip = ""; 
+        var output = "<table id='min700'><tr>";
+        var isblock = false;
+		var istract = false;
+		var isBG = false;
+		var donemap = false; 
+		
+		var statespot = 0; 
+        for (i = 0; i < obj.length; i++) {
+
+            if (i == 0) {
+                var valAr = obj[i].toString().split(",");
+				 
+				
+                for (var a = 0; a < valAr.length; a++) {
+                    if (a == 0) { output += "<th>" + valAr[a] + "</th>"; } else {
+                        output += "<th>" + valAr[a] + "</th>";
+                    }
+					
+					
+                    if (valAr[a] == "state") statespot = a;					
+                    if (valAr[a] == "block") isblock = true;
+					 if (valAr[a] == "tract") istract = true;
+					  if (valAr[a] == "block group") isBG = true;
+					 
+                }
+                output += "</tr>";
+            }
+            else {
+                output += "<tr>"
+                var valAr = obj[i].toString().split(",");
+				
+                for (var a = 0; a < valAr.length; a++) {
+                    if (a < statespot) { output += "<td align=right>" + valAr[a] + "</td>";
+                    if(a==0) v1 += valAr[a] + ",";
+					if(a==1) v2 += valAr[a] + ",";
+					if(a==2) v3 += valAr[a] + ",";
+
+					}
+                    else {
+					//alert(istract +  "   " + isBG +   "   " +isblock)
+					//alert(a + "  " + vallength  + "  " +  valAr[a]  ); 
+					
+					
+                        if (a == statespot) {
+                            output += "<td><a href=javascript:doajax()>" + valAr[a] + "</a></td>";
+                        }
+
+                        if (a == statespot + 1 ) {
+						  tlevel = "county"
+                            output += "<td><a href=javascript:drillt('" + valAr[a] + "')>" + valAr[a] + "</a>   " + gname(valAr[a]) + "</td>";
+							  if (istract == true) {
+							  cfip =   valAr[a] ;
+							  }
+                        }
+                        if (a == statespot + 2 ) {
+						   tlevel = "tract"
+						   // set current county
+						//   alert(valAr[a - 1]  + "   " + fipsAr[0] );
+						if(donemap == false){
+						     for (var f = 0; f < fipsAr.length; f++) {
+                                if ( valAr[a - 1] == fipsAr[f]) {
+								    donemap = true; 
+                                    countyToTracts(f);
+                                   // doajax(fval, inval);									
+								 	map.fitBounds(counties[f].getBounds()); 
+									
+                                    break;
+									
+                                }
+                            }
+						   }
+						   
+						   
+						  
+						   
+                            output += "<td>" + valAr[a] + " <a href=javascript:drillBG('" + valAr[a - 1] + "," + valAr[a] + "')>BLKG</a>.. <a href=javascript:drillB('" + valAr[a - 1] + "," + valAr[a] + "')>BLK</a></td>";
+							  if (istract == true) {
+							  trlist +=   valAr[a] + ",";
+							  }
+							
+                        }
+                        if (a == statespot + 3 ) {
+						 tlevel = "BG"
+                            if (isblock != true) {
+                                output += "<td align=center><a href=javascript:drillfB('" + valAr[a - 2] + "," + valAr[a - 1] + "," + valAr[a] + "')>" + valAr[a] + "</a></td>";
+                            } else {
+                                output += "<td><a href=javascript:dblock('" +  valAr[a - 2].toString() + "," + valAr[a - 1].toString() + "," + valAr[a].toString() +  "')>"  + valAr[a] +  "</a></td>";
+                            }							
+                        }						
+					 
+					 
+					
+
+
+
+					 
+						
+						
+
+                    }
+                }
+                output += "</tr>";
+            }
+        }
+		
+		
+		
+
+		
+        output += "</table>";
+		
+	
+        Div2.innerHTML = output;
+		
+			doTmap();
+    }			
+		
+
+
+
+    function drillt(cid) {
+        var fval = "tract:*"
+        var inval = "state:13+county:" + cid;
+        doajax(fval, inval);
+		var zto;
+		
+		for(i=0; i < fipsAr.length; i++){
+		  if(cid == fipsAr[i]){ 
+		      map.fitBounds(counties[i].getBounds());
+		  
+		  }
+		}
+		
+		
+    }
+	
+	
+	
+    var isdrillBG = false;
+	var clicktract = "";
+    function drillBG(cid) {
+      clicktract = "";
+	  isdrillBG = true;
+        var geo = cid.split(",")
+
+        var fval = "block+group:*"
+        var inval = "state:13+county:" + geo[0] + "+tract:" + geo[1];
+        doajax(fval, inval);
+        clicktract =  "" + geo[1].toString();
+		
+		
+    }
+
+	var clickBlock = "";
+    function dblock(cid) {
+        clickBlock = "";
+        var geo = cid.split(",")
+        clickBlock =  geo[0].toString() +  geo[1].toString() + geo[2].toString()  ;
+        var fval = "block:*"
+        var inval = "state:13+county:" + geo[0] + "+tract:" + geo[1];
+        doajax(fval, inval);
+		var zto; 
+		 for (var i = 0; i < polysblocks.length; i++) {
+		 polysblocks[i].setOptions( { fillColor: 'yellow' });
+		    if(clickBlock == blockpolyfip[i]){//alert(clickBlock +  "  " + polysblocks[i].getPaths().getAt(0));
+			zto =  polysblocks[i].getPath().getAt(0);
+			//alert(zto.lat());
+							   polysblocks[i].setOptions( { fillColor: 'red' });	
+							   
+							    map.setCenter(zto); 
+                             map.setZoom(12);
+			}
+		}
+		
+    }
+	
+	
+    function drillB(cid) {
+       
+        var geo = cid.split(",")
+        
+        var fval = "block:*"
+        var inval = "state:13+county:" + geo[0] + "+tract:" + geo[1];
+        doajax(fval, inval);
+		loadBlock(geo[0]); 
+		
+		var zto;
+		for(i=0; i < fipsAr.length; i++){
+		  if(geo[0] == fipsAr[i]){ 
+		    for(k=0; k < gmarkers.length; k++){
+			   if(labels[i] == gmarkers[k].title)zto = gmarkers[k].position;
+			
+			}
+		  
+		  }
+		}
+		
+		 map.setCenter(zto); 
+          map.setZoom(10);
+		
+		
+    }
+	
+	var clickBG = "";
+	  function drillfB(cid) {
+         clickBG = "";
+        var geo = cid.split(",")
+         clickBG =  geo[0].toString() +  geo[1].toString() + geo[2].toString()  ;
+		loadBG(geo[0]); 
+		
+		
+	 	
+		 // alert(clickBG);
+    }
+	
+		
+				
+</script>
+<script src="Scripts/counties.js" type="text/javascript" ></script>
+<script src="Scripts/tracts2.js" type="text/javascript" ></script>
+</body>
+
+
+
