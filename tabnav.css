@@ -1,0 +1,53 @@
+#tabcontent {
+border-left:1px solid #000000;
+border-right:1px solid #000000;
+border-bottom:1px solid #000000;
+padding:10px 5px 6px 5px;
+}
+
+
+/*Tab Navigation*/
+ul#tabnav {
+list-style-type:none;
+margin:0;
+padding-left:40px;
+padding-bottom:24px;
+border-bottom:1px solid #000000;
+font: bold 11px verdana, arial, sans-serif;
+}
+
+
+ul#tabnav li {
+float:left;
+height:21px;
+background-color:#94CE18;
+color:#000000;
+margin:2px 2px 0 2px;
+border:1px solid #000000;
+
+}
+
+
+ul#tabnav a:link, ul#tabnav a:visited {
+display:block;
+color:#000000;
+background-color:transparent;
+text-decoration:none;
+padding:4px;
+}
+
+
+ul#tabnav a:hover{
+background-color:#72ABEB;
+color:#FFFFFF;
+}
+
+ul#tabnav a.activeTab{
+border-bottom:0px solid #FFFFFF;
+color:#000000;
+background-color:#FFFFFF;
+
+/*background-color:lavender;*/
+
+font: bold 11px verdana, arial, sans-serif;
+}
